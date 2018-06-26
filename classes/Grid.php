@@ -1,43 +1,46 @@
 <?php
 // namespace Games\Sudoku\Grid;
 
-require_once( 'Cell.php' );
+require_once( 'classes/Cell.php' );
+require_once( 'interfaces/GridInterface.php' );
 
-class Grid {
+class Grid implements GridInterface {
 	public $cells;
-	public $raw_data;
-	public $changed_grid;
-	private $cell_group;
 
 	function __construct( $filename, $puzzle_number ) {
-		$grids_raw = file_get_contents( $filename );
-		$this->get_grid_from_qqwing( $grids_raw, $puzzle_number );
+		$this->create( null, 0 );
 	}
 
-	private function get_grid_from_csv( $grid_raw ) {
-		$grid_rows = explode( "\n", $grid_csv );
+	public function create( $grids_raw, $puzzle_number ) {
 		for ( $row = 0; $row < 9; $row ++ ) {
-			$grid_row = explode( ',', $grid_rows[ $row ] );
 			for ( $col = 0; $col < 9; $col ++ ) {
-				$this->cells[ $row ][ $col ] = new Cell( $grid_row[ $col ] );
+				$this->cells[ $row ][ $col ] = new Cell();
 			}
 		}
 	}
 
-	private function get_grid_from_qqwing( $grids_raw, $puzzle_number ) {
-		$puzzles = explode( "\n", $grids_raw );
-		if ( false === isset( $puzzles[ $puzzle_number ] ) ) {
-			die();
-		}
-		$puzzle_data = $puzzles[ $puzzle_number ];
-		$this->raw_data = $puzzle_data;
-		for ( $row = 0; $row < 9; $row ++ ) {
-			for ( $col = 0; $col < 9; $col ++ ) {
-				$cell_value = substr( $puzzle_data, 0, 1 );
-				$puzzle_data = substr( $puzzle_data, 1, 100 );
-				$this->cells[ $row ][ $col ] = new Cell( $cell_value );
+	public function get_grid_html() {
+		$grid_out = '';
+		$grid_out .= '<table style="border-spacing:0px;border:5px solid #000;">' . "\n";
+		for ( $r = 0; $r < 9; $r ++ ) {
+			$grid_out .= '<tr>' . "\n";
+			for ( $c = 0; $c < 9; $c ++ ) {
+				// escape out
+				$cell = $this->cells[ $r ][ $c ];
+				$token = ( 9 === sizeof( $cell->options ) ) ? ' ' : implode( ',', $cell->options );
+				$css = '';
+				if ( 0 === $c % 3 ) {
+					$css .= 'border-left:5px solid #000;';
+				}
+				if ( 0 === $r % 3 ) {
+					$css .= 'border-top:5px solid #000;';
+				}
+				$grid_out .= '<td style="border:1px solid #000;padding:10px;'. $css . '">' . $token . '</td>' . "\n";
 			}
+			$grid_out .= '</tr>' . "\n";
 		}
+		$grid_out .= '</table>' . "\n";
+		return $grid_out;
 	}
 
 	public function get_cell_options( $row, $col ) {
@@ -212,31 +215,6 @@ class Grid {
 			$this->changed_grid = true;
 		}
 		$this->cells[ $row ][ $col ]->options = array_values( $this->cells[ $row ][ $col ]->options );
-	}
-
-	public function get_grid_html() {
-		$grid_out = '';
-		$grid_out .= '<table style="border-spacing:0px;border:5px solid #000;">' . "\n";
-		for ( $r = 0; $r < 9; $r ++ ) {
-			$grid_out .= '<tr>' . "\n";
-			for ( $c = 0; $c < 9; $c ++ ) {
-				// escape out
-				$cell = $this->cells[ $r ][ $c ];
-				// echo gettype( $cell );
-				$token = ( 9 === sizeof( $cell->options ) ) ? ' ' : implode( ',', $cell->options );
-				$css = '';
-				if ( 0 === $c % 3 ) {
-					$css .= 'border-left:5px solid #000;';
-				}
-				if ( 0 === $r % 3 ) {
-					$css .= 'border-top:5px solid #000;';
-				}
-				$grid_out .= '<td style="border:1px solid #000;padding:10px;'. $css . '">' . $token . '</td>' . "\n";
-			}
-			$grid_out .= '</tr>' . "\n";
-		}
-		$grid_out .= '</table>' . "\n";
-		return $grid_out;
 	}
 
 }

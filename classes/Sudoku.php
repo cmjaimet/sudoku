@@ -4,7 +4,7 @@ require_once( 'Grid.php' );
 class Sudoku {
 	private $grid;
 
-	function __construct( Grid $grid ) {
+	function __construct( GridInterface $grid ) {
 		$this->grid = $grid;
 	}
 
@@ -19,7 +19,7 @@ class Sudoku {
 				echo 'No more changes found.';
 				break;
 			}
-			echo $this->grid->get_grid_html();
+			// echo $this->grid->get_grid_html();
 		}
 		echo $this->grid->get_grid_html();
 		echo '<p>You ' . ( true === $complete ? 'succeeded' : 'failed' ) . ' in ' . ( $x + 1 ) . ' turns</p>';
