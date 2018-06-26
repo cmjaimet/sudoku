@@ -6,6 +6,8 @@ require_once( 'Cell.php' );
 class Grid {
 	public $cells;
 	public $raw_data;
+	public $changed_grid;
+	private $cell_group;
 
 	function __construct( $filename, $puzzle_number ) {
 		$grids_raw = file_get_contents( $filename );
@@ -53,88 +55,168 @@ class Grid {
 		return $cell_options;
 	}
 
-	/**
-	* @param array $other_cells Array of Cell objects
-	* @param array $cell_options Array of integers possible in this cell
-	*/
-	private function check_options_array( $other_cells, $cell_options ) {
-		$sizetwo = array();
-		foreach ( $other_cells as $key => $cell ) {
-			// skip current cell
-			if ( 1 === sizeof( $cell->options ) ) {
-				$cell_val = (int) $cell->options[0];
-				if ( false !== ( $key = array_search( $cell_val, $cell_options ) ) ) {
-    			unset( $cell_options[ $key ] );
+	private function get_cell_groups( $row, $col ) {
+		$cell_group = array();
+		$mode = ( is_null( $row ) ) ? 'col' : 'row';
+		for ( $other = 0; $other < 9; $other ++ ) {
+			if ( 'col' === $mode ) {
+				$row = $other;
+			} else {
+				$col = $other;
+			}
+			$key = sizeof( $this->cells[ $row ][ $col ]->options );
+			if ( 3 >= $key ) {
+				if ( false === isset( $cell_group[ $key ] ) ) {
+					$cell_group[ $key ] = array();
 				}
-			} elseif ( 2 === sizeof( $cell->options ) ) {
-				if ( false !== ( $key = array_search( $cell->options, $sizetwo ) ) ) {
-					// remove both $cell->options[0], $cell->options[1] from $cell_options
-					if ( false !== ( $key = array_search( $cell->options[0], $cell_options ) ) ) {
-	    			unset( $cell_options[ $key ] );
-					}
-					if ( false !== ( $key = array_search( $cell->options[1], $cell_options ) ) ) {
-	    			unset( $cell_options[ $key ] );
-					}
-				} else {
-					$sizetwo[] = $cell->options;
-				}
+				$cell_group[ $key ][] = $this->cells[ $row ][ $col ]->options;
 			}
 		}
-		$cell_options = array_values( $cell_options );
-		return $cell_options;
+		return $cell_group;
 	}
 
-	private function check_row( $row, $col, $cell_options ) {
-		$other_cells = $this->cells[ $row ]; // now this is an array of objects
-		unset( $other_cells[ $col ] ); // remove the current cell
-		$other_cells = array_values( $other_cells );
-		$cell_options = $this->check_options_array( $other_cells, $cell_options );
-		return $cell_options;
+	private function get_cells_in_row( $row ) {
+		$cell_group = array();
+		for ( $col = 0; $col < 9; $col ++ ) {
+			$cell_group[] = array( $row, $col );
+		}
+		return $cell_group;
 	}
 
-	private function check_col( $row, $col, $cell_options ) {
-		$other_cells = array_column( $this->cells, $col ); // now this is an array of objects
-		unset( $other_cells[ $row ] ); // remove the current cell
-		$other_cells = array_values( $other_cells );
-		$cell_options = $this->check_options_array( $other_cells, $cell_options );
-		return $cell_options;
+	private function get_cells_in_col( $col ) {
+		$cell_group = array();
+		for ( $row = 0; $row < 9; $row ++ ) {
+			$cell_group[] = array( $row, $col );
+		}
+		return $cell_group;
 	}
 
-	private function check_box( $row, $col, $cell_options ) {
-		$other_cells = array();
-		$box_row = intval( $row / 3 ) * 3;
-		$box_col = intval( $col / 3 ) * 3;
+	private function get_cells_in_box( $box ) {
+		$cell_group = array();
+		$box_row = intval( $box / 3 ) * 3;
+		$box_col = ( $box % 3 ) * 3;
 		for ( $r = 0; $r < 3; $r ++ ) {
 			for ( $c = 0; $c < 3; $c ++ ) {
 				$cell_row = $r + $box_row;
 				$cell_col = $c + $box_col;
-				if ( ( $cell_row !== $row ) || ( $cell_col !== $col ) ) {
-					// echo '--'.$cell_row, $cell_col,$row, $col,'<br/>';
-					$cell_value = $this->cells[ $cell_row ][ $cell_col ];
-					$other_cells[] = $cell_value; // now this is an array of objects
+				$cell_group[] = array( $cell_row, $cell_col );
+			}
+		}
+		return $cell_group;
+	}
+
+	private function get_cell_coords_from_box( $box, $r, $c ) {
+		return array( $cell_row, $cell_col );
+	}
+
+	private function check_cell_group() {
+		for ( $x = 0; $x < sizeof( $this->cell_group ); $x++ ) {
+			$row = $this->cell_group[$x][0];
+			$col = $this->cell_group[$x][1];
+			$cell = $this->cells[ $row ][ $col ]->options;
+			$cell_size = sizeof( $cell );
+			if ( 3 >= $cell_size ) {
+				$other_cells = $this->cell_group;
+				unset( $other_cells[ $x ] );
+				$continue = false;
+				if ( 3 === $cell_size ) {
+					// only continue if there are 2 more like this or containing at least two of these numbers in its array
+					$count_continue = 0;
+					foreach ( $other_cells as $temp_key => $temp_coords ) {
+						$temp_row = $temp_coords[0];
+						$temp_col = $temp_coords[1];
+						$count_number = 0;
+						$count_all = true;
+						foreach ( $this->cells[ $temp_row ][ $temp_col ]->options as $key => $temp_number ) {
+							if ( ! in_array( $temp_number, $cell ) ) {
+								$count_all = false;
+								break;
+							}
+						}
+						if (true === $count_all ) {
+							$count_continue ++;
+							unset( $other_cells[ $temp_key ] );
+							if ( 2 === $count_continue ) {
+								$continue = true;
+								break;
+							}
+						}
+					}
+				} elseif ( 2 === $cell_size ) {
+					// only continue if there's another like this
+					foreach ( $other_cells as $key => $temp_coords ) {
+						$temp_row = $temp_coords[0];
+						$temp_col = $temp_coords[1];
+						if ( $this->cells[ $temp_row ][ $temp_col ]->options === $cell ) {
+							unset( $other_cells[ $key ] );
+							$continue = true;
+							break;
+						}
+					}
+				} else {
+					$continue = true;
+				}
+				if ( true === $continue ) {
+					foreach ( $other_cells as $key => $other_coords ) {
+						$other_row = $other_coords[0];
+						$other_col = $other_coords[1];
+						$other_cell = $this->cells[ $other_row ][ $other_col ]->options;
+						foreach ( $cell as $number ) {
+							$this->remove_cell_number( $other_row, $other_col, $number );
+						}
+					}
 				}
 			}
 		}
-		$cell_options = $this->check_options_array( $other_cells, $cell_options );
-		return $cell_options;
+	}
+
+	private function check_row( $row ) {
+		$this->cell_group = $this->get_cells_in_row( $row );
+		$this->check_cell_group();
+	}
+
+	private function check_col( $col ) {
+		$this->cell_group = $this->get_cells_in_col( $col );
+		$this->check_cell_group();
+	}
+
+	private function check_box( $box ) {
+		$this->cell_group = $this->get_cells_in_box( $box );
+		$this->check_cell_group();
 	}
 
 	public function check_grid() {
-		$success = true;
+		$this->changed_grid = false;
+		for ( $row = 0; $row < 9; $row ++ ) {
+			$this->check_row( $row );
+		}
+		for ( $col = 0; $col < 9; $col ++ ) {
+			$this->check_col( $col );
+		}
+		for ( $box = 0; $box < 9; $box ++ ) {
+			$this->check_box( $box );
+		}
 		for ( $row = 0; $row < 9; $row ++ ) {
 			for ( $col = 0; $col < 9; $col ++ ) {
-				$this->cells[ $row ][ $col ]->options = $this->get_cell_options( $row, $col );
-				if ( $success && ( 1 < sizeof( $this->cells[ $row ][ $col ]->options ) ) ) {
-					$success = false;
+				if ( 1 < sizeof( $this->cells[ $row ][ $col ]->options ) ) {
+					return false;
 				}
 			}
 		}
-		return $success;
+		return true;
+	}
+
+	private function remove_cell_number( $row, $col, $number ) {
+		if ( false !== ( $key = array_search( $number, $this->cells[ $row ][ $col ]->options ) ) ) {
+			unset( $this->cells[ $row ][ $col ]->options[ $key ] );
+			$this->changed_grid = true;
+		}
+		$this->cells[ $row ][ $col ]->options = array_values( $this->cells[ $row ][ $col ]->options );
 	}
 
 	public function get_grid_html() {
 		$grid_out = '';
-		$grid_out .= '<table style="border-spacing:0px;border:3px solid #000;">' . "\n";
+		$grid_out .= '<table style="border-spacing:0px;border:5px solid #000;">' . "\n";
 		for ( $r = 0; $r < 9; $r ++ ) {
 			$grid_out .= '<tr>' . "\n";
 			for ( $c = 0; $c < 9; $c ++ ) {
@@ -144,10 +226,10 @@ class Grid {
 				$token = ( 9 === sizeof( $cell->options ) ) ? ' ' : implode( ',', $cell->options );
 				$css = '';
 				if ( 0 === $c % 3 ) {
-					$css .= 'border-left:3px solid #000;';
+					$css .= 'border-left:5px solid #000;';
 				}
 				if ( 0 === $r % 3 ) {
-					$css .= 'border-top:3px solid #000;';
+					$css .= 'border-top:5px solid #000;';
 				}
 				$grid_out .= '<td style="border:1px solid #000;padding:10px;'. $css . '">' . $token . '</td>' . "\n";
 			}
