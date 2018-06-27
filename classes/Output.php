@@ -3,7 +3,7 @@
 class Output {
 	private $grid;
 
-	function __construct( $grid ) {
+	function __construct( GridInterface $grid ) {
 		$this->grid = $grid;
 	}
 
