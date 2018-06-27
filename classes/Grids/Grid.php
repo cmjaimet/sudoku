@@ -1,23 +1,20 @@
 <?php
 // namespace Games\Sudoku\Grid;
 
-require_once( 'Cell.php' );
-require_once( 'GridInterface.php' );
+require_once( 'classes/Cell.php' );
+require_once( 'interfaces/GridInterface.php' );
 
 class Grid implements GridInterface {
 	public $cells;
 
 	function __construct( $filename, $puzzle_number ) {
-		$grids_raw = file_get_contents( $filename );
-		$this->create( $grids_raw );
+		$this->create( null, 0 );
 	}
 
-	public function create( $grid_raw, $puzzle_number = 0 ) {
-		$grid_rows = explode( "\n", $grid_csv );
+	public function create( $grids_raw, $puzzle_number ) {
 		for ( $row = 0; $row < 9; $row ++ ) {
-			$grid_row = explode( ',', $grid_rows[ $row ] );
 			for ( $col = 0; $col < 9; $col ++ ) {
-				$this->cells[ $row ][ $col ] = new Cell( $grid_row[ $col ] );
+				$this->cells[ $row ][ $col ] = new Cell();
 			}
 		}
 	}
@@ -30,7 +27,6 @@ class Grid implements GridInterface {
 			for ( $c = 0; $c < 9; $c ++ ) {
 				// escape out
 				$cell = $this->cells[ $r ][ $c ];
-				// echo gettype( $cell );
 				$token = ( 9 === sizeof( $cell->options ) ) ? ' ' : implode( ',', $cell->options );
 				$css = '';
 				if ( 0 === $c % 3 ) {
@@ -45,6 +41,14 @@ class Grid implements GridInterface {
 		}
 		$grid_out .= '</table>' . "\n";
 		return $grid_out;
+	}
+
+	private function remove_cell_number( $row, $col, $number ) {
+		if ( false !== ( $key = array_search( $number, $this->cells[ $row ][ $col ]->options ) ) ) {
+			unset( $this->cells[ $row ][ $col ]->options[ $key ] );
+			$this->changed_grid = true;
+		}
+		$this->cells[ $row ][ $col ]->options = array_values( $this->cells[ $row ][ $col ]->options );
 	}
 
 }
