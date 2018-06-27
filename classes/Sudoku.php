@@ -1,23 +1,29 @@
 <?php
 require_once( 'Grid.php' );
+require_once( 'Guess.php' );
 
 class Sudoku {
 	private $grid;
+	private $grid_original = null;
+	private $guess = null;
+	private $debug = false;
 
 	function __construct( GridInterface $grid ) {
 		$this->grid = $grid;
+		$this->debug = false;
 	}
 
 	public function play( $max_turns ) {
 		echo $this->grid->get_grid_html(); // starting board
 		for ( $x = 0; $x < $max_turns; $x ++  ) {
 			$complete = $this->check_grid();
-			if ( true === $complete ) {
-				break;
-			}
-			if ( false === $this->grid->changed_grid ) {
-				echo 'No more changes found.';
-				break;
+			if ( ( true === $this->grid->failed ) || ( false === $this->grid->changed ) ) {
+				// ok now we start guessing
+				$this->guess();
+			} else {
+				if ( true === $complete ) {
+					break;
+				}
 			}
 			// echo $this->grid->get_grid_html();
 		}
@@ -25,7 +31,28 @@ class Sudoku {
 		echo '<p>You ' . ( true === $complete ? 'succeeded' : 'failed' ) . ' in ' . ( $x + 1 ) . ' turns</p>';
 	}
 
-d	private function get_cell_groups( $row, $col ) {
+	private function guess() {
+		echo $this->grid->get_grid_html();
+		if ( ! is_null( $this->grid_original ) ) {
+			echo 'Guess failed so assume the opposite. ' . $this->guess->row . ', ' . $this->guess->col . ' === ' . $this->guess->other . '<br />';
+			echo $this->grid->get_grid_html();
+			// $this->grid = clone $this->grid_original; // we're in the middle of a guess and it failed so revert and guess the opposite
+			$this->grid = unserialize( serialize( $this->grid_original ) );
+			$this->grid_original = null; // reset
+			$this->grid->set_cell( $this->guess->row, $this->guess->col, $this->guess->other );
+		} else {
+			echo 'No more changes found. Taking a guess.<br />';
+			// copy the first grid away for safe-keeping while we see if the guess works - fails if we go through this again with the guess - so we would need deeper recursion technique - cloning is unreliable in PHP
+			$this->grid_original = unserialize( serialize( $this->grid ) );
+			$this->grid->is_guess = true;
+			$this->guess = new Guess( $this->grid, $this->guess );
+			$this->grid->set_cell( $this->guess->row, $this->guess->col, $this->guess->number );
+			echo $this->grid->get_grid_html();
+			// exit;
+		}
+	}
+
+	private function get_cell_groups( $row, $col ) {
 		$cell_group = array();
 		$mode = ( is_null( $row ) ) ? 'col' : 'row';
 		for ( $other = 0; $other < 9; $other ++ ) {
@@ -34,12 +61,13 @@ d	private function get_cell_groups( $row, $col ) {
 			} else {
 				$col = $other;
 			}
-			$key = sizeof( $this->cells[ $row ][ $col ]->options );
+
+			$key = sizeof( $this->grid->cells[ $row ][ $col ]->options );
 			if ( 3 >= $key ) {
 				if ( false === isset( $cell_group[ $key ] ) ) {
 					$cell_group[ $key ] = array();
 				}
-				$cell_group[ $key ][] = $this->cells[ $row ][ $col ]->options;
+				$cell_group[ $key ][] = $this->grid->cells[ $row ][ $col ]->options;
 			}
 		}
 		return $cell_group;
@@ -83,7 +111,7 @@ d	private function get_cell_groups( $row, $col ) {
 		for ( $x = 0; $x < sizeof( $this->cell_group ); $x++ ) {
 			$row = $this->cell_group[$x][0];
 			$col = $this->cell_group[$x][1];
-			$cell = $this->cells[ $row ][ $col ]->options;
+			$cell = $this->grid->cells[ $row ][ $col ]->options;
 			$cell_size = sizeof( $cell );
 			if ( 3 >= $cell_size ) {
 				$other_cells = $this->cell_group;
@@ -97,7 +125,7 @@ d	private function get_cell_groups( $row, $col ) {
 						$temp_col = $temp_coords[1];
 						$count_number = 0;
 						$count_all = true;
-						foreach ( $this->cells[ $temp_row ][ $temp_col ]->options as $key => $temp_number ) {
+						foreach ( $this->grid->cells[ $temp_row ][ $temp_col ]->options as $key => $temp_number ) {
 							if ( ! in_array( $temp_number, $cell ) ) {
 								$count_all = false;
 								break;
@@ -117,7 +145,7 @@ d	private function get_cell_groups( $row, $col ) {
 					foreach ( $other_cells as $key => $temp_coords ) {
 						$temp_row = $temp_coords[0];
 						$temp_col = $temp_coords[1];
-						if ( $this->cells[ $temp_row ][ $temp_col ]->options === $cell ) {
+						if ( $this->grid->cells[ $temp_row ][ $temp_col ]->options === $cell ) {
 							unset( $other_cells[ $key ] );
 							$continue = true;
 							break;
@@ -130,9 +158,9 @@ d	private function get_cell_groups( $row, $col ) {
 					foreach ( $other_cells as $key => $other_coords ) {
 						$other_row = $other_coords[0];
 						$other_col = $other_coords[1];
-						$other_cell = $this->cells[ $other_row ][ $other_col ]->options;
+						$other_cell = $this->grid->cells[ $other_row ][ $other_col ]->options;
 						foreach ( $cell as $number ) {
-							$this->remove_cell_number( $other_row, $other_col, $number );
+							$this->grid->remove_cell_number( $other_row, $other_col, $number );
 						}
 					}
 				}
@@ -156,7 +184,7 @@ d	private function get_cell_groups( $row, $col ) {
 	}
 
 	public function check_grid() {
-		$this->changed_grid = false;
+		$this->grid->changed = false;
 		for ( $row = 0; $row < 9; $row ++ ) {
 			$this->check_row( $row );
 		}
@@ -168,7 +196,7 @@ d	private function get_cell_groups( $row, $col ) {
 		}
 		for ( $row = 0; $row < 9; $row ++ ) {
 			for ( $col = 0; $col < 9; $col ++ ) {
-				if ( 1 < sizeof( $this->cells[ $row ][ $col ]->options ) ) {
+				if ( 1 < sizeof( $this->grid->cells[ $row ][ $col ]->options ) ) {
 					return false;
 				}
 			}
