@@ -1,61 +1,31 @@
 <?php
-// namespace Games\Sudoku\Grid;
+require_once( 'Grid.php' );
 
-require_once( 'Cell.php' );
+class Sudoku {
+	private $grid;
 
-class Grid {
-	public $cells;
-	public $raw_data;
-	public $changed_grid;
-	private $cell_group;
-
-	function __construct( $filename, $puzzle_number ) {
-		$grids_raw = file_get_contents( $filename );
-		$this->get_grid_from_qqwing( $grids_raw, $puzzle_number );
+	function __construct( GridInterface $grid ) {
+		$this->grid = $grid;
 	}
 
-	private function get_grid_from_csv( $grid_raw ) {
-		$grid_rows = explode( "\n", $grid_csv );
-		for ( $row = 0; $row < 9; $row ++ ) {
-			$grid_row = explode( ',', $grid_rows[ $row ] );
-			for ( $col = 0; $col < 9; $col ++ ) {
-				$this->cells[ $row ][ $col ] = new Cell( $grid_row[ $col ] );
+	public function play( $max_turns ) {
+		echo $this->grid->get_grid_html(); // starting board
+		for ( $x = 0; $x < $max_turns; $x ++  ) {
+			$complete = $this->check_grid();
+			if ( true === $complete ) {
+				break;
 			}
-		}
-	}
-
-	private function get_grid_from_qqwing( $grids_raw, $puzzle_number ) {
-		$puzzles = explode( "\n", $grids_raw );
-		if ( false === isset( $puzzles[ $puzzle_number ] ) ) {
-			die();
-		}
-		$puzzle_data = $puzzles[ $puzzle_number ];
-		$this->raw_data = $puzzle_data;
-		for ( $row = 0; $row < 9; $row ++ ) {
-			for ( $col = 0; $col < 9; $col ++ ) {
-				$cell_value = substr( $puzzle_data, 0, 1 );
-				$puzzle_data = substr( $puzzle_data, 1, 100 );
-				$this->cells[ $row ][ $col ] = new Cell( $cell_value );
+			if ( false === $this->grid->changed_grid ) {
+				echo 'No more changes found.';
+				break;
 			}
+			// echo $this->grid->get_grid_html();
 		}
+		echo $this->grid->get_grid_html();
+		echo '<p>You ' . ( true === $complete ? 'succeeded' : 'failed' ) . ' in ' . ( $x + 1 ) . ' turns</p>';
 	}
 
-	public function get_cell_options( $row, $col ) {
-		// get the array of possible integers for this cell
-		$cell_options = $this->cells[ $row ][ $col ]->options;
-		if ( 1 < sizeof( $cell_options ) ) {
-			// there is more than one value possible for this cell
-			$cell_options = $this->check_row( $row, $col, $cell_options );
-			$cell_options = $this->check_col( $row, $col, $cell_options );
-			$cell_options = $this->check_box( $row, $col, $cell_options );
-			// if ( 1 === sizeof( $cell_options ) ) {
-			// 	$cell_options = $cell_options[0];
-			// }
-		}
-		return $cell_options;
-	}
-
-	private function get_cell_groups( $row, $col ) {
+d	private function get_cell_groups( $row, $col ) {
 		$cell_group = array();
 		$mode = ( is_null( $row ) ) ? 'col' : 'row';
 		for ( $other = 0; $other < 9; $other ++ ) {
@@ -204,39 +174,6 @@ class Grid {
 			}
 		}
 		return true;
-	}
-
-	private function remove_cell_number( $row, $col, $number ) {
-		if ( false !== ( $key = array_search( $number, $this->cells[ $row ][ $col ]->options ) ) ) {
-			unset( $this->cells[ $row ][ $col ]->options[ $key ] );
-			$this->changed_grid = true;
-		}
-		$this->cells[ $row ][ $col ]->options = array_values( $this->cells[ $row ][ $col ]->options );
-	}
-
-	public function get_grid_html() {
-		$grid_out = '';
-		$grid_out .= '<table style="border-spacing:0px;border:5px solid #000;">' . "\n";
-		for ( $r = 0; $r < 9; $r ++ ) {
-			$grid_out .= '<tr>' . "\n";
-			for ( $c = 0; $c < 9; $c ++ ) {
-				// escape out
-				$cell = $this->cells[ $r ][ $c ];
-				// echo gettype( $cell );
-				$token = ( 9 === sizeof( $cell->options ) ) ? ' ' : implode( ',', $cell->options );
-				$css = '';
-				if ( 0 === $c % 3 ) {
-					$css .= 'border-left:5px solid #000;';
-				}
-				if ( 0 === $r % 3 ) {
-					$css .= 'border-top:5px solid #000;';
-				}
-				$grid_out .= '<td style="border:1px solid #000;padding:10px;'. $css . '">' . $token . '</td>' . "\n";
-			}
-			$grid_out .= '</tr>' . "\n";
-		}
-		$grid_out .= '</table>' . "\n";
-		return $grid_out;
 	}
 
 }
