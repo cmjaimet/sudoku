@@ -61,6 +61,7 @@ class Sudoku {
 			} else {
 				$col = $other;
 			}
+
 			$key = sizeof( $this->grid->cells[ $row ][ $col ]->options );
 			if ( 3 >= $key ) {
 				if ( false === isset( $cell_group[ $key ] ) ) {
